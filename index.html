@@ -16,6 +16,7 @@
             --input-border: #335577;
             --danger: #ff4444;
             --danger-bg: #2a0a0a;
+            --warning: #ffaa00;
         }
 
         [data-theme="blood"] {
@@ -28,6 +29,7 @@
             --input-border: #773333;
             --danger: #ff0000;
             --danger-bg: #2a0000;
+            --warning: #ff5500;
         }
 
         [data-theme="gold"] {
@@ -40,6 +42,7 @@
             --input-border: #776633;
             --danger: #ff4a4a;
             --danger-bg: #2a0a0a;
+            --warning: #aaff00;
         }
 
         [data-theme="abyss"] {
@@ -52,6 +55,7 @@
             --input-border: #553377;
             --danger: #ff4444;
             --danger-bg: #2a0a0a;
+            --warning: #00ffcc;
         }
 
         body {
@@ -206,13 +210,13 @@
 
         /* Botões de Ação Final */
         .action-buttons {
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 15px;
             margin-top: 30px;
         }
         .btn {
             padding: 12px;
-            flex: 1;
             border-radius: 4px;
             cursor: pointer;
             font-family: inherit;
@@ -231,10 +235,21 @@
             color: #fff;
             box-shadow: 0 0 10px var(--primary);
         }
+        .btn-backup {
+            background: var(--input-bg);
+            color: var(--warning);
+            border: 1px solid var(--warning);
+        }
+        .btn-backup:hover {
+            background: var(--warning);
+            color: #000;
+            box-shadow: 0 0 10px var(--warning);
+        }
         .btn-limpar {
             background: var(--danger-bg);
             color: var(--danger);
             border: 1px solid var(--danger);
+            grid-column: 1 / -1; /* Ocupa a linha toda */
         }
         .btn-limpar:hover {
             background: var(--danger);
@@ -249,6 +264,11 @@
             width: 100%;
             margin-bottom: 20px;
             box-shadow: 0 0 15px rgba(255, 170, 0, 0.4);
+            padding: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            border-radius: 4px;
+            cursor: pointer;
         }
 
         /* Sistema de Abas */
@@ -267,7 +287,7 @@
         @media (max-width: 600px) {
             .grid-4col { grid-template-columns: 1fr 1fr; }
             .grid-2col { grid-template-columns: 1fr; }
-            .action-buttons { flex-direction: column; }
+            .action-buttons { grid-template-columns: 1fr; }
         }
 
         /* REGRAS DE IMPRESSÃO */
@@ -351,7 +371,7 @@
         </div>
         <div class="input-group">
             <label>Títulos Adicionais:</label>
-            <textarea id="titulos_adicionais" placeholder="Liste seus outros títulos..."></textarea>
+            <textarea id="titulos_adicionais" placeholder="Liste seus outrosítulos..."></textarea>
         </div>
 
         <div class="section-title">Status e Atributos</div>
@@ -450,10 +470,14 @@
         </div>
     </div>
 
-    <!-- Botões Finais -->
+    <!-- Botões Finais de Exportar/Importar -->
     <div class="action-buttons" id="botoesFinais">
-        <button class="btn btn-pdf" onclick="prepararPDF()">[Gerar PDF da Encarnação]</button>
-        <button class="btn btn-limpar" onclick="limparFicha()">[Apagar Registro]</button>
+        <button class="btn btn-pdf" onclick="prepararPDF()">[Gerar PDF]</button>
+        <button class="btn btn-backup" onclick="exportarBackup()">[Exportar Backup]</button>
+        <button class="btn btn-backup" onclick="triggerImport()">[Importar Backup]</button>
+        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importarBackup(event)">
+        
+        <button class="btn btn-limpar" onclick="limparFicha()">[Apagar Registro da Encarnação]</button>
     </div>
 
 </div>
@@ -476,26 +500,22 @@
     // PREPARAÇÃO PERFEITA PARA PDF
     // ------------------------------------
     function prepararPDF() {
-        // 1. Mostra todas as abas simultaneamente na tela
         const abas = document.querySelectorAll('.tab-content');
         abas.forEach(aba => {
             aba.style.display = 'block';
             aba.classList.add('active');
         });
 
-        // 2. Oculta os botões normais e mostra o botão de voltar
         document.getElementById('menuControles').style.display = 'none';
         document.getElementById('botoesFinais').style.display = 'none';
         document.getElementById('btnVoltar').style.display = 'block';
 
-        // 3. AGORA calcula a altura real de cada caixa de texto (já que estão visíveis)
         const textareas = document.querySelectorAll('textarea');
         textareas.forEach(ta => {
-            ta.style.height = 'auto'; // Zera
-            ta.style.height = (ta.scrollHeight + 15) + 'px'; // Expande para caber o texto exato
+            ta.style.height = 'auto';
+            ta.style.height = (ta.scrollHeight + 15) + 'px';
         });
 
-        // 4. Aciona a janela nativa. Se falhar, avisa o usuário para usar o menu
         setTimeout(() => {
             window.print();
             alert("✅ MODO PDF ATIVADO!\n\nSe a tela de salvamento não abriu sozinha, vá no menu do navegador (três pontinhos) > Compartilhar > Imprimir.\n\nDepois clique no botão amarelo para voltar.");
@@ -506,22 +526,85 @@
     // SAIR DO MODO PDF
     // ------------------------------------
     function sairPDF() {
-        // Restaura botões
         document.getElementById('menuControles').style.display = 'flex';
-        document.getElementById('botoesFinais').style.display = 'flex';
+        document.getElementById('botoesFinais').style.display = 'grid'; // Volta pro Grid
         document.getElementById('btnVoltar').style.display = 'none';
 
-        // Oculta todas as abas e mostra apenas a selecionada no menu
         const abaAtiva = document.getElementById('tabSelect').value;
         const abas = document.querySelectorAll('.tab-content');
         
         abas.forEach(aba => {
-            aba.style.display = ''; // Limpa o estilo inline
+            aba.style.display = '';
             aba.classList.remove('active');
         });
         document.getElementById(abaAtiva).classList.add('active');
     }
 
+    // ------------------------------------
+    // EXPORTAR DADOS (BACKUP JSON)
+    // ------------------------------------
+    function exportarBackup() {
+        let dadosBackup = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            let chave = localStorage.key(i);
+            if (chave.startsWith('fichaORV_')) {
+                dadosBackup[chave] = localStorage.getItem(chave);
+            }
+        }
+        
+        let jsonStr = JSON.stringify(dadosBackup, null, 2);
+        let blob = new Blob([jsonStr], { type: "application/json" });
+        let url = URL.createObjectURL(blob);
+        
+        let a = document.createElement('a');
+        let nomePersonagem = document.getElementById('nome').value || "Encarnacao";
+        a.href = url;
+        a.download = `StarStream_${nomePersonagem.replace(/[^a-z0-9]/gi, '_')}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // ------------------------------------
+    // IMPORTAR DADOS (BACKUP JSON)
+    // ------------------------------------
+    function triggerImport() {
+        document.getElementById('importFile').click();
+    }
+
+    function importarBackup(event) {
+        let arquivo = event.target.files[0];
+        if (!arquivo) return;
+
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                let dadosImportados = JSON.parse(e.target.result);
+                let count = 0;
+                
+                // Sobrescreve o armazenamento local apenas com chaves válidas da ficha
+                for (let chave in dadosImportados) {
+                    if (chave.startsWith('fichaORV_')) {
+                        localStorage.setItem(chave, dadosImportados[chave]);
+                        count++;
+                    }
+                }
+                
+                if(count > 0) {
+                    alert("✅ Atributos sincronizados pelo Sistema! A página será recarregada.");
+                    location.reload();
+                } else {
+                    alert("❌ O arquivo não contém dados válidos do Star Stream.");
+                }
+            } catch (erro) {
+                alert("❌ Erro ao ler o arquivo. Certifique-se de que é um arquivo JSON gerado por esta ficha.");
+            }
+        };
+        reader.readAsText(arquivo);
+    }
+
+    // ------------------------------------
+    // APAGAR FICHA
+    // ------------------------------------
     function limparFicha() {
         if(confirm("AVISO DO SISTEMA: Tem certeza que deseja apagar todos os dados desta Encarnação? Isso não pode ser desfeito.")) {
             Object.keys(localStorage).forEach(key => {
@@ -533,6 +616,9 @@
         }
     }
 
+    // ------------------------------------
+    // INICIALIZAÇÃO E SALVAMENTO AUTOMÁTICO
+    // ------------------------------------
     window.addEventListener('DOMContentLoaded', () => {
         const tabSelect = document.getElementById('tabSelect');
         const tabs = document.querySelectorAll('.tab-content');
@@ -560,7 +646,7 @@
 
         const campos = document.querySelectorAll('input:not([readonly]), textarea');
         campos.forEach(campo => {
-            if(campo.id) {
+            if(campo.id && campo.type !== 'file') { // Ignora o input file no salvamento automático
                 const valorSalvo = localStorage.getItem('fichaORV_' + campo.id);
                 if(valorSalvo !== null) {
                     campo.value = valorSalvo;
